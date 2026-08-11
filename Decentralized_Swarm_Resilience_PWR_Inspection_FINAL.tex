@@ -1,0 +1,420 @@
+\documentclass[journal]{IEEEtran}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{cite}
+\usepackage{url}
+
+\begin{document}
+
+\title{Decentralized Swarm Resilience Under Stochastic Gamma Noise: A Computational Model for Pressure Vessel Inspection}
+
+\author{
+\IEEEauthorblockN{Dhyan Ishwar Shaji}
+\IEEEauthorblockA{New Millennium School\\Kingdom of Bahrain\\Email: dhyanishwarshaji890@gmail.com}
+\thanks{D. I. Shaji is with New Millennium School, Kingdom of Bahrain (e-mail: dhyanishwarshaji890@gmail.com). ORCID iD: 0009-0006-6063-4533.}
+\thanks{Manuscript prepared for submission to IEEE Transactions on Mobile Computing.}
+}
+
+\maketitle
+
+\begin{abstract}
+Structural integrity monitoring of the primary coolant loop in Pressurized Water Reactors (PWRs) constitutes a critical yet technologically underserved inspection domain, owing to the coexistence of high-Reynolds-number turbulent flow regimes and intense, spatially heterogeneous gamma radiation fields. Conventional inspection modalities---tethered remotely operated vehicles (ROVs) and centralized swarm architectures---exhibit systematic failure modes under these conditions: physical tethers are subject to catastrophic shear loading and entanglement, while fiber-optic communication links suffer from radiation-induced attenuation (RIA), and centralized command topologies present a single point of failure vulnerable to dose-driven electronic latch-up. This paper proposes a decentralized, communication-degradation-tolerant swarm intelligence framework, instantiated as a Modified Particle Swarm Optimization (M-PSO) algorithm, for autonomous micro-agent navigation and defect localization under simultaneous hydrodynamic and radiological stressors. A reduced-order computational simulator is developed and made available as supplementary material, coupling a stochastic turbulent velocity field with agent-level hydrodynamic drag kinematics, a non-homogeneous radiation dose map inducing dual-phenomenon microelectronic degradation (continuous sensor noise injection and discrete, dose-dependent communication packet loss), and a genuine per-agent cumulative-dose state driving permanent hardware failure. The proposed M-PSO variant employs neighborhood-restricted information propagation, gated on a per-agent binary channel-state variable, to preserve search coherence despite severe stochastic data loss. A Monte Carlo benchmarking campaign (500 independent trials per condition) directly executed from the accompanying simulator script shows that the decentralized swarm sustains a target-localization success rate of $84.4\%$ (95\% CI $[81.0, 87.3]$) under catastrophic gamma flux, versus only $1.4\%$ for a centralized leader-follower baseline evaluated under identical conditions---a collapse mechanistically traced to single-point failure of the leader's communication hardware. A non-drag-aware canonical PSO baseline is also benchmarked and found to underperform the proposed architecture across all regimes. These results substantiate decentralization as a necessary architectural principle for resilient autonomous inspection in extreme nuclear environments.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Swarm robotics, particle swarm optimization, nuclear inspection, decentralized control, radiation-hardened systems, turbulent hydrodynamics, fault-tolerant communication.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:intro}
+
+The primary coolant loop of a Pressurized Water Reactor (PWR) represents one of the most physically inaccessible and hazardous environments subject to mandatory structural inspection within civilian nuclear infrastructure. In-service inspection of coolant pipe walls, weld seams, and cladding surfaces is required to detect flow-accelerated corrosion, stress corrosion cracking, and fatigue-induced flaws before they propagate to failure. This inspection task must be conducted within an environment characterized by two compounding extremes. First, the coolant flow field is fully turbulent, with Reynolds numbers frequently exceeding $Re > 10^5$, producing highly non-laminar velocity fluctuations, localized vortex shedding, and unsteady hydrodynamic forcing on any submerged inspection platform. Second, proximity to the reactor core and adjacent fuel assemblies subjects any in-loop apparatus to extreme, spatially non-homogeneous gamma radiation fields, with localized dose rates capable of inducing near-immediate degradation of unshielded microelectronics. The confluence of these two stressors---turbulent shear and catastrophic ionizing flux---renders the primary loop interior an environment for which no mature, field-proven autonomous inspection solution currently exists~\cite{pwr_inspection,perrow_accidents}.
+
+Existing inspection technologies are fundamentally ill-suited to this dual-hazard environment. Tethered remotely operated vehicles (ROVs), the incumbent solution in analogous underwater inspection contexts, rely on a physical umbilical for both power delivery and command-and-control signaling. Under the shear stresses imposed by $Re > 10^5$ turbulent flow, tethers are subject to snagging, fatigue fracture, and drag-induced destabilization of the vehicle's pose, compromising both mission continuity and platform recoverability. Where fiber-optic tethers are substituted to mitigate electromagnetic interference concerns, an additional failure mode emerges: radiation-induced attenuation (RIA), wherein cumulative ionizing dose generates color-center defects within the fiber's silica lattice, progressively increasing optical attenuation and ultimately severing the communication channel entirely~\cite{ria_optical}. Centralized swarm architectures, in which a designated leader agent aggregates sensor data and issues global commands, offer no structural improvement; the leader agent constitutes a single point of failure whose loss---whether through localized dose accumulation, electronic latch-up, or single-event upset---results in catastrophic, non-recoverable mission termination for the entire swarm, a vulnerability broadly consistent with field-documented fragility of teleoperated and semi-autonomous robotic systems operating in high-radiation environments~\cite{nagatani_fukushima,kawatsuma_robots}, where single points of hardware or communication failure have repeatedly curtailed mission duration.
+
+These limitations motivate a paradigm shift toward decentralized, bio-inspired multi-agent coordination. Particle Swarm Optimization (PSO), originally formulated by Kennedy and Eberhart to model the emergent, self-organizing search behavior of biological swarms~\cite{pso_canonical}, offers an attractive coordination substrate precisely because no single agent's failure is catastrophic to the collective search process. Each agent's trajectory is governed canonically by
+\begin{equation}
+v_i^{t+1} = \omega v_i^{t} + c_1 r_1 \left(p_i^{\text{best}} - x_i^{t}\right) + c_2 r_2 \left(g^{\text{best}} - x_i^{t}\right)
+\end{equation}
+\begin{equation}
+x_i^{t+1} = x_i^{t} + v_i^{t+1}
+\end{equation}
+where $\omega$ denotes the inertia weight, $c_1, c_2$ are cognitive and social acceleration coefficients, and $r_1, r_2 \sim U(0,1)$ introduce stochastic exploration. However, the canonical PSO formulation presupposes flawless, zero-latency, zero-noise transmission of both $p_i^{\text{best}}$ and $g^{\text{best}}$ across the swarm's communication topology---an assumption that is categorically violated within a radiologically active, hydrodynamically turbulent PWR coolant loop, where both the physical state and the communicated state of each agent are subject to continuous stochastic corruption.
+
+It is important to scope precisely what is, and is not, novel in the approach that follows. Restricting each agent's social attractor to a locally-defined neighborhood rather than the swarm-global best is itself a well-established PSO variant, dating to Kennedy's small-world and ring-topology studies~\cite{kennedy_small_worlds} and later generalized by Mendes et al.'s Fully Informed Particle Swarm~\cite{mendes_fips}; this paper does not claim to introduce neighborhood-restricted attraction as a search mechanism. Nor is the empirical finding that a topology with no single point of failure degrades gracefully while a leader-follower topology collapses catastrophically a new theoretical result in itself: it is a specific numerical instance of structural properties already established in the distributed consensus and switching-topology literature~\cite{olfati_saber_murray,ren_beard}. What this paper contributes is narrower and more specific: a physically-grounded process for \emph{generating} the neighborhood topology itself, in which graph edges are gated jointly by inter-agent range and a radiologically-driven, dual-mechanism (transient Bernoulli and permanent cumulative-dose) hardware failure model, coupled to per-agent hydrodynamic drag kinematics specific to a turbulent PWR coolant channel. The closest prior work in spirit is Ristic et al.'s decentralized multi-platform search for a hazardous source in a turbulent flow~\cite{ristic_turbulent_search}; that work addresses decentralized estimation-theoretic source localization under turbulent dispersion, whereas this paper addresses swarm-optimization search kinematics under a coupled hydrodynamic-\emph{and}-radiological hazard model in which the communication medium itself, not merely the search target's dispersion signature, is degraded by the hazard. Similarly, rather than extending an existing general-purpose radiation-aware robotics simulator such as the Gazebo-based platform of Wright et al.~\cite{wright_gazebo_radiation}, a reduced-order, purpose-built simulator was chosen specifically to make a $500\times3\times3$ Monte Carlo benchmarking campaign computationally tractable within this study's scope; this is a pragmatic engineering trade-off, not a claim that the custom simulator is more physically complete than full rigid-body physics engines, and is revisited as a limitation in Section~\ref{sec:conclusion}.
+
+This paper addresses the gap between idealized PSO theory and the physical realities of extreme-environment deployment by developing and validating a reduced-order computational model of decentralized swarm inspection under coupled hydrodynamic and radiological adversity, in the tradition of recent nuclear-robotics field platforms~\cite{groves_mallard,nancekievill_avexis} and radiation-aware robotic simulation environments~\cite{wright_gazebo_radiation}. The contributions of this work are threefold:
+
+\begin{enumerate}
+\item \textbf{Hydrodynamic Agent Kinematics.} A stochastic turbulent fluid velocity profile is modeled and coupled to a per-agent hydrodynamic drag vector, $\vec{F}_d = -\tfrac{1}{2}\rho C_d A \lvert \vec{v}_{\text{rel}} \rvert \vec{v}_{\text{rel}}$, such that each swarm agent's kinematic state is subject to physically realistic disturbance forces consistent with $Re > 10^5$ flow conditions, rather than idealized frictionless point-particle motion.
+\item \textbf{Non-Homogeneous Radiation-Induced Degradation.} A spatially heterogeneous gamma dose-rate field is constructed and mapped to two distinct microelectronic degradation phenomena affecting each agent: (i) continuous, dose-rate-proportional sensor noise injected into each agent's positional and fitness estimates, and (ii) discrete communication packet loss modeled as a non-homogeneous Poisson process, $P(k \text{ drops}) = \frac{(\lambda(t))^k e^{-\lambda(t)}}{k!}$, with $\lambda(t)$ scaling with local instantaneous dose rate.
+\item \textbf{Decentralized Adaptive Swarm Mechanisms.} A modified, fully decentralized PSO variant is detailed, employing neighborhood-restricted information exchange gated by a per-agent, radiologically-driven binary channel-state variable, and is shown to preserve global search efficiency and target-localization accuracy under severe, spatially correlated packet dropout conditions that would otherwise collapse a centralized coordination scheme.
+\end{enumerate}
+
+The remainder of this paper is organized as follows: Section II details the computational simulator architecture, including the turbulent flow model, radiation dose field construction, and the formal decentralized communication graph; Section III presents the simulation configuration, convergence and trajectory results, and a comprehensive quantitative baseline comparison; and Section IV concludes with a discussion of modeling limitations and future engineering pathways.
+
+\section{System Architecture and Mathematical Model}
+\label{sec:architecture}
+
+This section formalizes the coupled physical and communication-theoretic model underlying the decentralized swarm simulator. Three interacting subsystems are specified: (A) the kinematic swarm update law governing individual agent motion under a modified PSO formulation, including the formal decentralized communication graph; (B) the turbulent hydrodynamic environment and the resultant drag forcing imposed upon each agent; and (C) the non-homogeneous ionizing radiation field and its dual-phenomenon degradation of onboard sensing and inter-agent communication. Each subsystem is derived from first principles and subsequently integrated into a unified agent-state update executed at each discrete simulation timestep $t$.
+
+\subsection{Kinematic Swarm Update System}
+\label{sec:kinematic}
+
+The motion of each swarm agent $i \in \{1, \dots, N\}$ is governed by a modified Particle Swarm Optimization (M-PSO) velocity update that augments the canonical cognitive-social formulation with an explicit physical forcing term arising from fluid-structure interaction:
+
+\begin{multline}
+\vec{v}_i(t+1) = w\,\vec{v}_i(t) + c_1 r_1 \left(\vec{p}_i(t) - \vec{x}_i(t)\right) \\
+{} + \chi_i(t)\, c_2 r_2 \left(\vec{g}_i(t) - \vec{x}_i(t)\right) + \frac{\vec{F}_d}{m}\,\Delta t
+\label{eq:velocity-update}
+\end{multline}
+
+\begin{equation}
+\vec{x}_i(t+1) = \vec{x}_i(t) + \vec{v}_i(t+1)\,\Delta t
+\label{eq:position-update}
+\end{equation}
+
+The inclusion of the term $(\vec{F}_d / m)\,\Delta t$ constitutes the principal departure from canonical PSO: it embeds Newtonian dynamics directly into the swarm's search kinematics, such that each agent's realized trajectory is the resultant of both algorithmic intent (the cognitive-social terms) and unavoidable physical disturbance (hydrodynamic drag). A note on dimensional consistency is warranted here: the cognitive and social terms of Eq.~(\ref{eq:velocity-update}) are, following long-standing convention in the PSO literature~\cite{pso_canonical,shi_eberhart_1998}, treated as an abstract velocity-space control input in which $c_1, c_2$ implicitly carry the correct units to convert a position error into a velocity contribution over one algorithmic step; this convention is standard and is not itself a physical force. The drag contribution, by contrast, is a genuine kinematic acceleration, $\vec{F}_d/m$, and is therefore explicitly integrated over the simulation timestep $\Delta t$ in Eq.~(\ref{eq:velocity-update}) so that it combines correctly, in a forward-Euler sense consistent with the position update of Eq.~(\ref{eq:position-update}), with the algorithmic velocity contribution rather than being added as a raw acceleration. This coupling is essential to fidelity, as it precludes agents from executing arbitrarily precise search trajectories in a medium that physically resists such motion. Note also that Eq.~(\ref{eq:velocity-update}) replaces the canonical swarm-global attractor $\vec{g}^{\text{best}}$ with an agent-specific, neighborhood-local attractor $\vec{g}_i(t)$, formalized below, reflecting the decentralized communication topology under which the swarm operates.
+
+\subsubsection{Dynamic Communication Graph}
+\label{sec:comm-graph}
+
+The information-sharing topology of the swarm is not static or fully connected; it is instead modeled, following standard multi-agent graph-theoretic conventions~\cite{decentralized_graphs}, as a time-varying directed graph subject to both spatial constraints and stochastic radiological interference. Let
+\begin{equation}
+\mathcal{G}(t) = \left(\mathcal{V}, \mathcal{E}(t)\right)
+\end{equation}
+denote the swarm communication graph at timestep $t$, where $\mathcal{V} = \{1, \dots, N\}$ is the static set of micro-agents. The set of active directed communication edges $\mathcal{E}(t)$ is dynamic and spatially dependent. An edge $(j,i) \in \mathcal{E}(t)$ represents a successful transmission from neighboring agent $j$ to agent $i$, which occurs if and only if both agents are within physical range \emph{and} both agents' shared transmit/receive hardware is simultaneously operational:
+\begin{equation}
+\|\vec{x}_j(t) - \vec{x}_i(t)\| \le r_{\text{comm}} \quad \text{and} \quad \chi_j(t) = 1 \quad \text{and} \quad \chi_i(t) = 1
+\label{eq:comm-edge}
+\end{equation}
+where $r_{\text{comm}}$ is the physical range of the transceivers, and $\chi_k(t) \in \{0,1\}$ (for any agent $k$) is the single, per-agent binary channel-state variable formally introduced in Section~\ref{sec:param-defs}:
+\begin{equation}
+\chi_k(t) \sim \text{Bernoulli}\left(1 - P_{\text{drop}}(\vec{x}_k(t))\right).
+\end{equation}
+This single variable per agent is deliberately reused for both roles in Eq.~(\ref{eq:comm-edge}): $\chi_j(t)$ gates $j$'s ability to transmit and $\chi_i(t)$ gates $i$'s ability to receive, since both functions share the same physical transceiver hardware and are therefore assumed to fail together under radiation-induced degradation, rather than being modeled as independently-failing transmit and receive channels. Consequently, $\mathcal{N}_i(t)$ (Eq.~\ref{eq:neighborhood}) already excludes every inbound edge whenever $\chi_i(t)=0$, collapsing to $\mathcal{N}_i(t) = \{i\}$ in that case; Section~\ref{sec:radiation} explains why the velocity update of Eq.~(\ref{eq:velocity-update}) additionally gates the social term on $\chi_i(t)$ rather than relying on this self-collapse alone.
+
+\subsubsection{Neighborhood-Restricted Local Best}
+\label{sec:local-best}
+
+The active communication neighborhood of agent $i$ at step $t$ is defined as
+\begin{equation}
+\mathcal{N}_i(t) = \left\{ j \in \mathcal{V} \;\middle|\; (j,i) \in \mathcal{E}(t) \right\} \cup \{i\}
+\label{eq:neighborhood}
+\end{equation}
+Under this formulation, the local target attractor is decentralized and neighborhood-specific:
+\begin{equation}
+\vec{g}_i(t) = \arg\max_{j \in \mathcal{N}_i(t)} \left\{ f\left(\vec{p}_j(t)\right) \right\}
+\label{eq:local-gbest}
+\end{equation}
+where $f(\cdot)$ is the localized, noise-corrupted signal fitness evaluation. Because $\mathcal{N}_i(t)$ is itself a stochastic function of the communication graph $\mathcal{G}(t)$, the attractor $\vec{g}_i(t)$ may differ substantially across agents at any given timestep, and may in the limiting case reduce to $\mathcal{N}_i(t) = \{i\}$---full spatial and informational isolation---whenever all inbound edges to agent $i$ fail simultaneously.
+
+\subsubsection{Parameter Definitions}
+\label{sec:param-defs}
+
+Each quantity appearing in Eqs.~(\ref{eq:velocity-update})--(\ref{eq:local-gbest}) is formally defined as follows:
+
+\begin{itemize}
+    \item $\vec{x}_i(t) \in \mathbb{R}^2$ --- the \textbf{position vector} of agent $i$ at timestep $t$, resolved in the two-dimensional pipe cross-sectional plane.
+    \item $\vec{v}_i(t) \in \mathbb{R}^2$ --- the \textbf{velocity vector} of agent $i$, representing the net rate of positional change under combined propulsive and hydrodynamic influence.
+    \item $w \in \mathbb{R}^{+}$ --- the \textbf{inertia weight}, governing retention of the agent's prior velocity state and thereby controlling the exploration-exploitation trade-off; larger $w$ favors sustained exploratory trajectories, while smaller $w$ favors rapid convergence toward known optima.
+    \item $c_1 \in \mathbb{R}^{+}$ --- the \textbf{cognitive acceleration coefficient}, scaling the agent's attraction toward its own historically best-discovered position, $\vec{p}_i(t)$.
+    \item $c_2 \in \mathbb{R}^{+}$ --- the \textbf{social acceleration coefficient}, a fixed, swarm-wide hyperparameter (never reassigned at runtime) scaling the agent's attraction toward the neighborhood-local best-known position, $\vec{g}_i(t)$, whenever that attraction is actively realized via the channel-state gate $\chi_i(t)$ defined next.
+    \item $\chi_i(t) \in \{0,1\}$ --- the \textbf{binary channel-state variable} of agent $i$ at timestep $t$ (see Eq.~\ref{eq:comm-edge}), representing whether agent $i$'s shared transmit/receive hardware is operational. This variable gates the social term of Eq.~(\ref{eq:velocity-update}) on a per-agent, per-timestep basis, so that packet loss is modeled by a runtime state variable rather than by reassigning the fixed hyperparameter $c_2$.
+    \item $r_1, r_2 \sim U(0,1)$ --- independent \textbf{stochastic scalars} drawn from a uniform distribution, introducing exploratory randomness into the cognitive and social attraction terms and preventing premature convergence to local optima.
+    \item $\vec{p}_i(t) \in \mathbb{R}^2$ --- the \textbf{personal-best position} of agent $i$, defined as
+    \begin{equation}
+    \vec{p}_i(t) = \arg\max_{\tau \le t} f\left(\vec{x}_i(\tau)\right)
+    \end{equation}
+    where $f(\cdot)$ is the fitness function encoding proximity to the inspection target (e.g., the measured sensor signal magnitude, $S_{\text{measured}}(\vec{x})$, corresponding to a structural fissure signature). A single maximization convention is used consistently throughout this paper: larger $f$ denotes a stronger, more target-proximal signal, for both the personal-best update here and the neighborhood-best attractor of Eq.~(\ref{eq:local-gbest}), and for the personal-best update condition in Algorithm~\ref{alg:mpso}.
+    \item $\vec{g}_i(t) \in \mathbb{R}^2$ --- the \textbf{neighborhood-local best position}, as defined in Eq.~(\ref{eq:local-gbest}), evaluated over the dynamic, dose-dependent communication neighborhood $\mathcal{N}_i(t)$ rather than over the full swarm $\mathcal{V}$.
+    \item $\vec{F}_d \in \mathbb{R}^2$ --- the \textbf{hydrodynamic drag force} vector (Section~\ref{sec:hydro}), and $m$ the agent's physical mass, such that $(\vec{F}_d / m)\,\Delta t$ yields the drag-induced velocity contribution over one simulation timestep.
+\end{itemize}
+
+\subsection{Turbulent Hydrodynamics and Drag Modeling}
+\label{sec:hydro}
+
+Unlike idealized PSO search spaces, in which the medium of traversal is assumed inert, the interior of a PWR primary coolant pipe presents a fully turbulent flow field that actively and continuously perturbs agent motion. The fluid velocity is not spatially uniform across the pipe cross-section; rather, it is well-approximated, for fully developed turbulent pipe flow at $Re > 10^5$, by the empirical one-seventh power-law profile~\cite{turbulent_flow}, augmented with a stochastic turbulent fluctuation term:
+
+\begin{equation}
+\vec{v}_{\text{fluid}}(y) = v_{\max}\left(1 - \frac{|y|}{R}\right)^{\frac{1}{7}}\hat{i} + \vec{v}_{\text{turb}}
+\end{equation}
+\begin{equation}
+\vec{v}_{\text{turb}} \sim \mathcal{N}\left(0, \sigma_{\text{turb}}^2\right)
+\end{equation}
+
+where $y \in [-R, R]$ denotes the transverse (wall-normal) coordinate within the pipe cross-section, $R$ is the pipe radius, and $v_{\max}$ is the centerline (maximal) mean flow velocity. The mean-flow term enforces the two physically necessary boundary conditions of turbulent internal flow: (i) a no-slip condition at the pipe walls, $y = \pm R$, at which $\vec{v}_{\text{fluid}} \to 0$, reflecting the viscous sublayer adjacent to the solid boundary; and (ii) a velocity maximum at the centerline, $y = 0$, at which $\vec{v}_{\text{fluid}} = v_{\max}\hat{i}$, consistent with the flattened, plug-like velocity distribution characteristic of turbulent (as opposed to parabolic laminar) flow. The additive stochastic term $\vec{v}_{\text{turb}}$, drawn independently at each timestep from a zero-mean Gaussian distribution of variance $\sigma_{\text{turb}}^2$, models the isotropic turbulent eddy fluctuations superimposed upon the mean flow---a first-order stochastic representation of the Reynolds-decomposed fluctuating velocity component, $u' = u - \bar{u}$, omitting full closure of the Reynolds-averaged Navier--Stokes (RANS) equations in favor of computational tractability while preserving the essential stochastic forcing character relevant to agent perturbation.
+
+This spatially and temporally varying fluid velocity field is coupled to agent motion through a non-linear hydrodynamic drag force, formulated per the standard quadratic drag relation for bluff bodies at high relative Reynolds number:
+
+\begin{equation}
+\vec{F}_d = -\frac{1}{2}\rho C_d A \left\|\vec{v}_i(t) - \vec{v}_{\text{fluid}}(y)\right\|^2 \hat{u}_d
+\end{equation}
+
+where $\rho$ is the mass density of the coolant medium (water, $\rho \approx 1000\ \text{kg/m}^3$ under nominal PWR operating conditions, subject to adjustment for elevated temperature and pressure); $C_d$ is the dimensionless drag coefficient, empirically determined by agent geometry and surface characteristics, capturing form and skin-friction drag contributions; $A$ is the agent's cross-sectional area presented normal to the direction of relative flow; and $\hat{u}_d = \dfrac{\vec{v}_i(t) - \vec{v}_{\text{fluid}}(y)}{\left\|\vec{v}_i(t) - \vec{v}_{\text{fluid}}(y)\right\|}$ is the unit vector of relative velocity, ensuring that the drag force is directed opposite to the agent's motion relative to the local fluid, per the fundamental dissipative character of drag forces.
+
+The quadratic dependence on relative velocity magnitude renders this forcing term strongly non-linear: agents attempting rapid traversal against the mean flow, particularly within the near-wall boundary region where velocity gradients are steepest, experience disproportionately amplified resistive forcing. This non-linearity is physically consequential, as it implies that swarm search efficiency is not merely locally perturbed but globally shaped by the pipe's flow topology---search trajectories favor migration with, rather than against, the bulk flow direction, a bias entirely absent from idealized PSO formulations.
+
+\subsection{Ionizing Radiation Degradation Fields}
+\label{sec:radiation}
+
+The second principal environmental hazard is the presence of a spatially non-homogeneous gamma radiation field, concentrated in the vicinity of the structural fissure under inspection---a physically realistic assumption, as flow-accelerated corrosion and stress-corrosion cracking sites are frequently co-located with localized activation or contamination sources within the coolant loop. The dose rate field is modeled as a background term superimposed with an inverse-square-law contribution centered at the fissure location $\vec{x}_f$:
+
+\begin{equation}
+D(\vec{x}) = D_{\text{bg}} + \frac{K}{\|\vec{x} - \vec{x}_f\|^2 + 1.0}
+\end{equation}
+
+Here, $D_{\text{bg}}$ denotes the ambient background dose rate present throughout the coolant loop irrespective of proximity to the fissure, $K$ is a source-intensity scaling constant governing the magnitude of the localized dose enhancement, and the regularizing constant $1.0$ in the denominator prevents numerical singularity as $\vec{x} \to \vec{x}_f$, while still permitting the dose rate to attain arbitrarily severe magnitudes in the immediate neighborhood of the target---a physically salient feature, since the inspection objective necessarily requires agents to approach the very region of highest radiological hazard, establishing an inherent and unavoidable trade-off between mission success and agent survivability.
+
+This dose field induces two mechanistically distinct forms of microelectronic degradation, reflecting well-documented radiation effects on unhardened or partially hardened embedded electronics~\cite{radiation_mos}.
+
+\textbf{(a) Sensor Gaussian Noise.} Cumulative ionizing dose induces displacement damage and transient charge generation within semiconductor sensing elements, manifesting as a dose-rate-proportional increase in measurement noise variance~\cite{sensor_degradation}. This is modeled as additive Gaussian corruption of the true structural signal $S(\vec{x})$:
+
+\begin{equation}
+S_{\text{measured}}(\vec{x}) = S(\vec{x}) + \epsilon_{\gamma}, \qquad \epsilon_{\gamma} \sim \mathcal{N}\left(0,\ \sigma_\gamma^2\, D(\vec{x})\right)
+\end{equation}
+
+such that the noise variance scales linearly with local instantaneous dose rate, $D(\vec{x})$, via the proportionality constant $\sigma_\gamma^2$. Consequently, an agent's fitness evaluation---and therefore its capacity to correctly update $\vec{p}_i$---becomes progressively less reliable precisely as it approaches the region of greatest inspection interest, introducing a fundamental epistemic uncertainty at the point of maximal mission value.
+
+\textbf{(b) Poisson Communication Loss.} Independently of sensor corruption, cumulative dose induces transient and permanent faults within RF or optical communication transceivers (e.g., single-event upsets, RIA-driven attenuation), modeled as a discrete stochastic packet-drop process. The probability that agent $i$'s outbound communication packet is dropped at position $\vec{x}$ is given by:
+
+\begin{equation}
+P_{\text{drop}}(\vec{x}) = 1 - e^{-\beta D(\vec{x})}
+\end{equation}
+
+where $\beta$ is a dose-to-failure sensitivity constant characterizing the radiation hardness of the communication hardware. This exponential saturation form ensures $P_{\text{drop}} \to 1$ as $D(\vec{x})$ grows large, consistent with near-certain communication failure under catastrophic local dose rates, while preserving $P_{\text{drop}} \to \beta D(\vec{x})$ for small dose rates, consistent with a Poisson-thinned first-order failure process.
+
+Critically, the occurrence of a packet drop is not merely a delay in information propagation but is modeled as an instantaneous severing of the agent's access to swarm-level coordination, via the channel-state variable $\chi_i(t)$ introduced in Section~\ref{sec:param-defs} and Eq.~(\ref{eq:comm-edge}). Substituting $\chi_i(t) = 0$ into Eq.~(\ref{eq:velocity-update}) causes the social term to vanish for that agent and timestep alone, reducing the update to a purely cognitive-inertial motion decoupled from $\vec{g}_i(t)$. This mechanism formalizes the physical reality of spatial and informational isolation: an agent suffering a transient communication loss does not fail outright but is temporarily reduced to autonomous, locally-informed search, relying solely on its own historical best estimate $\vec{p}_i$ and residual inertia until swarm connectivity is stochastically restored.
+
+Transient packet loss, however, does not capture the physically distinct phenomenon of \emph{permanent} hardware failure under sustained radiological exposure. To formalize this, each agent accumulates a running dose state
+\begin{equation}
+\Lambda_i(t) = \Lambda_i(t-1) + D(\vec{x}_i(t))\,\Delta t, \qquad \Lambda_i(0) = 0,
+\label{eq:cumdose}
+\end{equation}
+representing the total ionizing dose absorbed by agent $i$'s hardware up to timestep $t$. Once this accumulated dose reaches a hardware-specific failure threshold $\Lambda_{\text{fail}}$, the agent's transceiver is deemed to have suffered permanent, non-recoverable latch-up:
+\begin{equation}
+\Lambda_i(t) \ge \Lambda_{\text{fail}} \implies \chi_i(t') = 0 \quad \forall\, t' \ge t,
+\label{eq:latchup}
+\end{equation}
+i.e., the channel-state variable is forced to zero for the remainder of the mission, regardless of the agent's subsequent position or the instantaneous value of $P_{\text{drop}}$. This distinction is what separates the transient, recoverable isolation described above from the irreversible language used elsewhere in this paper (e.g., ``latch-up,'' ``irrecoverable degradation''): only Eq.~(\ref{eq:latchup})'s cumulative-dose condition is treated as permanent; ordinary Bernoulli packet loss governed by $P_{\text{drop}}(\vec{x})$ alone is always transient and may be stochastically restored at any subsequent timestep. It is precisely the resilience of the swarm's aggregate search performance under this combination of recurrent transient isolation and occasional permanent hardware loss---rather than the performance of any individual agent---that constitutes the central object of investigation in the sections that follow.
+
+\subsection{Algorithmic Summary}
+\label{sec:algo-summary}
+
+Algorithm~\ref{alg:mpso} consolidates the physical and communication-theoretic subsystems formalized above into a single, executable procedure, mapping each computational step directly to its governing equation.
+
+\begin{algorithm}[t]
+\caption{Communication-Degradation-Tolerant Decentralized M-PSO for Turbulent Pipe Inspection}
+\label{alg:mpso}
+\begin{algorithmic}[1]
+\Require Swarm size $N$; max steps $t_{\max}$; pipe geometry $(L, R)$; fissure position $\vec{x}_f$; physical constants $(\rho, C_d, A, m)$; flow constants $(v_{\max}, \sigma_{\text{turb}})$; radiological constants $(D_{\text{bg}}, K, \beta, \sigma_\gamma, \Lambda_{\text{fail}})$; algorithmic constants $(w, c_1, c_2, r_{\text{comm}}, \Delta t, v_{\text{clamp}})$
+\Ensure Neighborhood-local attractors $\{\vec{g}_i(t)\}$ and personal-best positions $\{\vec{p}_i(t_{\max})\}$ for all $i$
+
+\State \textbf{Initialization:}
+\For{$i = 1$ to $N$}
+    \State Initialize $\vec{x}_i(0) \sim U(\Omega_{\text{pipe}})$ \Comment{uniform draw over pipe cross-section}
+    \State $\vec{v}_i(0) \leftarrow \vec{0}$; \quad $\vec{p}_i(0) \leftarrow \vec{x}_i(0)$; \quad $\Lambda_i(0) \leftarrow 0$; \quad $\text{latched}_i \leftarrow \text{False}$
+    \State Evaluate initial fitness $f(\vec{p}_i(0))$
+\EndFor
+
+\For{$t = 0$ to $t_{\max} - 1$}
+    \State \textbf{// Phase 1: Per-Agent Physical and Radiological Update}
+    \For{$i = 1$ to $N$}
+        \State Compute $\vec{v}_{\text{fluid}}(\vec{x}_i(t)) \leftarrow v_{\max}\left(1 - \dfrac{|y_i(t)|}{R}\right)^{1/7}\hat{i} + \vec{v}_{\text{turb}}$, \quad $\vec{v}_{\text{turb}} \sim \mathcal{N}(0, \sigma_{\text{turb}}^2)$
+        \State Compute relative velocity $\vec{v}_{\text{rel}} \leftarrow \vec{v}_i(t) - \vec{v}_{\text{fluid}}(\vec{x}_i(t))$
+        \State Compute drag force $\vec{F}_d \leftarrow -\dfrac{1}{2}\rho C_d A \|\vec{v}_{\text{rel}}\|^2 \hat{u}_d$, \quad $\hat{u}_d \leftarrow \vec{v}_{\text{rel}} / \|\vec{v}_{\text{rel}}\|$
+        \State Compute local dose rate $D(\vec{x}_i(t)) \leftarrow D_{\text{bg}} + \dfrac{K}{\|\vec{x}_i(t) - \vec{x}_f\|^2 + 1.0}$
+        \State Update cumulative dose: $\Lambda_i(t) \leftarrow \Lambda_i(t-1) + D(\vec{x}_i(t))\,\Delta t$
+        \If{$\Lambda_i(t) \ge \Lambda_{\text{fail}}$}
+            \State $\text{latched}_i \leftarrow \text{True}$ \Comment{Permanent transceiver latch-up}
+        \EndIf
+        \State Draw $u \sim U(0,1)$
+        \If{$u < 1 - e^{-\beta D(\vec{x}_i(t))}$ \textbf{or} $\text{latched}_i$}
+            \State $\chi_i(t) \leftarrow 0$ \Comment{Transient packet drop or permanent latch-up}
+        \Else
+            \State $\chi_i(t) \leftarrow 1$
+        \EndIf
+        \State Evaluate noise-corrupted fitness $S_{\text{measured}}(\vec{x}_i(t)) \leftarrow S(\vec{x}_i(t)) + \epsilon_\gamma$, \quad $\epsilon_\gamma \sim \mathcal{N}(0,\ \sigma_\gamma^2 D(\vec{x}_i(t)))$
+        \If{$S_{\text{measured}}(\vec{x}_i(t)) > f(\vec{p}_i(t))$}
+            \State $\vec{p}_i(t) \leftarrow \vec{x}_i(t)$
+            \State Update fitness record: $f(\vec{p}_i(t)) \leftarrow S_{\text{measured}}(\vec{x}_i(t))$
+        \EndIf
+    \EndFor
+
+    \State \textbf{// Phase 2: Inter-Agent Communication}
+    \State Construct communication graph $\mathcal{G}(t) = (\mathcal{V}, \mathcal{E}(t))$ where $(j,i) \in \mathcal{E}(t) \iff \|\vec{x}_j(t) - \vec{x}_i(t)\| \le r_{\text{comm}} \ \text{and}\ \chi_j(t) = 1 \ \text{and}\ \chi_i(t) = 1$
+    \For{$i = 1$ to $N$}
+        \State Construct neighbor set $\mathcal{N}_i(t) \leftarrow \{j \in \mathcal{V} \mid (j,i) \in \mathcal{E}(t)\} \cup \{i\}$
+        \State Update neighborhood attractor $\vec{g}_i(t) \leftarrow \displaystyle\arg\max_{j \in \mathcal{N}_i(t)} f(\vec{p}_j(t))$
+    \EndFor
+
+    \State \textbf{// Phase 3: Kinematic Integration}
+    \For{$i = 1$ to $N$}
+        \State Draw $r_1, r_2 \sim U(0,1)$
+        \State $\vec{v}_i(t+1) \leftarrow w\,\vec{v}_i(t) + c_1 r_1 (\vec{p}_i(t) - \vec{x}_i(t)) + \chi_i(t)\, c_2 r_2 (\vec{g}_i(t) - \vec{x}_i(t)) + \dfrac{\vec{F}_d}{m}\,\Delta t$
+        \State Clamp speed: $\vec{v}_i(t+1) \leftarrow \vec{v}_i(t+1) \cdot \min\!\left(1,\ v_{\text{clamp}} / \|\vec{v}_i(t+1)\|\right)$
+        \State $\vec{x}_i(t+1) \leftarrow \vec{x}_i(t) + \vec{v}_i(t+1)\,\Delta t$
+        \State \textbf{Boundary enforcement:} clamp $y_i(t+1) \leftarrow \text{clip}(y_i(t+1),\ -R,\ R)$
+        \State \hspace{4.2em} clamp $x_i(t+1) \leftarrow \text{clip}(x_i(t+1),\ 0,\ L)$
+    \EndFor
+\EndFor
+
+\Return $\{\vec{g}_i(t_{\max})\}_{i=1}^{N}$, $\{\vec{p}_i(t_{\max})\}_{i=1}^{N}$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Simulation Configuration and Results Analysis}
+\label{sec:simulation}
+
+The mathematical model formalized in Section II was instantiated in a discrete-time computational simulator (\texttt{pso\_nuclear\_sim.py}) executing a swarm of micro-agents across $t \in [0, 150]$ simulation steps within a bounded two-dimensional pipe cross-section of radius $R = 1.0\,\text{m}$, with Pipe Boundary Wall conditions enforced at $y = \pm 1.0\,\text{m}$ and the Target Micro-Fissure fixed near the outer wall at approximately $(x_f, y_f) \approx (8.0,\ 0.9)\,\text{m}$---a deliberately near-boundary placement situating the inspection target within the steepest region of the turbulent velocity gradient. Table~\ref{tab:sim-params} enumerates the complete set of physical and computational parameters used across all reported experiments.
+
+\begin{table}[t]
+\renewcommand{\arraystretch}{1.15}
+\caption{Physical and Computational Simulation Configuration Parameters}
+\label{tab:sim-params}
+\centering
+\footnotesize
+\begin{tabular}{@{}p{0.50\columnwidth} c c@{}}
+\toprule
+\textbf{Parameter} & \textbf{Notation} & \textbf{Value} \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Environment Dimensions}} \\
+\midrule
+Pipe Length & $L$ & $10.0\ \text{m}$ \\
+Pipe Radius & $R$ & $1.0\ \text{m}$ \\
+Fissure Position & $\vec{x}_f$ & $(8.0,\ 0.9)\ \text{m}$ \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Physical \& Hydrodynamic Constants}} \\
+\midrule
+Micro-agent Mass & $m$ & $0.05\ \text{kg}$ \\
+Coolant Density (water) & $\rho$ & $1000\ \text{kg/m}^3$ \\
+Drag Coefficient & $C_d$ & $0.47$ \\
+Frontal Cross-Sectional Area & $A$ & $1.257 \times 10^{-3}\ \text{m}^2$ \\
+Max Centerline Fluid Velocity & $v_{\max}$ & $1.5\ \text{m/s}$ \\
+Turbulent Fluctuation Std. Dev. & $\sigma_{\text{turb}}$ & $0.1\ \text{m/s}$ \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Algorithmic Parameters}} \\
+\midrule
+Swarm Size & $N$ & $25\ \text{agents}$ \\
+Timestep Size & $\Delta t$ & $0.1\ \text{s}$ \\
+Maximum Steps & $t_{\max}$ & $150\ \text{steps}$ \\
+Inertia Weight & $w$ & $0.6$ \\
+Cognitive Acceleration Weight & $c_1$ & $1.2$ \\
+Social Acceleration Weight & $c_2$ & $1.2$ \\
+Communication Range & $r_{\text{comm}}$ & $2.0\ \text{m}$ \\
+Velocity Clamp\textsuperscript{a} & $v_{\text{clamp}}$ & $3.0\ \text{m/s}$ \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Radiological Hazard Constants}} \\
+\midrule
+Control Profile $(D_{\text{bg}}, K)$ & --- & $(0.0,\ 0.0)\ \text{Gy/s}$ \\
+Moderate Profile $(D_{\text{bg}}, K)$ & --- & $(0.5,\ 10.0)\ \text{Gy/s}$ \\
+Extreme Profile $(D_{\text{bg}}, K)$ & --- & $(2.0,\ 100.0)\ \text{Gy/s}$ \\
+Packet Drop Sensitivity & $\beta$ & $0.15\ \text{s/Gy}$ \\
+Sensor Noise Proportionality & $\sigma_{\gamma}$ & $0.08$ \\
+Cumulative Dose Failure Threshold & $\Lambda_{\text{fail}}$ & $300.0\ \text{Gy}$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+\footnotesize\textsuperscript{a}Standard PSO velocity clamping~\cite{shi_eberhart_1998}, applied identically across all three benchmarked architectures to prevent numerical divergence of the discrete-time integration.
+\end{table}
+
+Three environmental regimes were evaluated, defined by the $(D_{\text{bg}}, K)$ pairs given in Table~\ref{tab:sim-params}: a Control Profile ($D_{\text{bg}}=K=0$), a Moderate Radiation Field, and an Extreme Stochastic Gamma Field. A mission is scored as successful if the swarm's best available position estimate comes within $0.3\,\text{m}$ of $\vec{x}_f$ at any point in the $150$-step horizon---a threshold selected, and used identically in both Fig.~\ref{fig:convergence} and the Section~\ref{sec:baseline} benchmarking table, to require genuine convergence rather than a fortuitous initial deployment position (see below). The inertia and acceleration weights $(w, c_1, c_2)$ in Table~\ref{tab:sim-params} follow commonly-used PSO defaults~\cite{shi_eberhart_1998}; a full hyperparameter sensitivity sweep is left to future work (Section~\ref{sec:conclusion}), but the velocity-clamping mechanism noted in Table~\ref{tab:sim-params} was found necessary to prevent divergence of the discrete-time integration and is applied identically across all three benchmarked architectures so that it cannot bias the comparison.
+
+All results reported in this section, including Figs.~\ref{fig:convergence}--\ref{fig:trajectories} and Table~\ref{tab:baseline-comparison}, are generated directly by the accompanying simulator script, \texttt{pso\_nuclear\_sim.py}, provided as supplementary material alongside this submission along with the exact Monte Carlo output logs (\texttt{results\_table2.csv}) used to populate Table~\ref{tab:baseline-comparison}; no figure or table entry in this section is hand-entered.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{pso_convergence_rates.pdf}
+\caption{Population-median swarm convergence distance to the target fissure, $\|\vec{g}-\vec{x}_f\|$, for the Decentralized M-PSO architecture across Control, Moderate, and Extreme radiological regimes, computed over 500 Monte Carlo runs per regime.}
+\label{fig:convergence}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{pso_swarm_trajectories.pdf}
+\caption{Agent physical pathways in the 2D pipe cross-section for the Decentralized M-PSO architecture under the Extreme radiological regime and full turbulent shear flow, illustrating path deviation induced by coupled hydrodynamic drag and stochastic packet loss (single representative run, all 25 agents).}
+\label{fig:trajectories}
+\end{figure*}
+
+\subsection{Analysis of Convergence Performance}
+\label{sec:convergence}
+
+\textbf{Control Profile.} Under the zero-radiation baseline, the population-median distance $\|\vec{g}-\vec{x}_f\|$ falls from an initial median of $0.51\,\text{m}$ (agents are deployed across the full pipe segment, so the typical starting distance to the fissure is already modest) to a stable plateau near $0.225\,\text{m}$ by $t \approx 25$, after which it remains essentially flat for the rest of the simulation horizon. This is the fastest of the three regimes to reach its terminal plateau, consistent with the absence of sensor or communication corruption.
+
+A diagnosis is warranted here, since Table~\ref{tab:baseline-comparison} reports only $64.8\%$ Control-profile success for the Decentralized M-PSO despite this being the noise-free, communication-loss-free, idealized baseline. A per-run breakdown shows this is not attributable to any agent diverging or becoming lost: across an independent diagnostic batch, the worst-case terminal distance observed was $0.78\,\text{m}$, and every failing run had already collapsed onto a stable plateau strictly between the $0.3\,\text{m}$ success threshold and $0.78\,\text{m}$. This is the classic premature-convergence (stagnation) failure mode analyzed theoretically by van den Bergh~\cite{van_den_bergh_2002}: once every agent's velocity decays toward the shared $\vec{p}_i \approx \vec{g}_i$ fixed point, Eq.~(\ref{eq:velocity-update})'s cognitive and social terms both vanish simultaneously, and---absent any noise source to perturb the swarm back into exploration---the swarm has no mechanism to escape a plateau that is close to, but not quite within, the success radius. This failure mode is intrinsic to the fixed-hyperparameter PSO update itself and is therefore \emph{not} radiologically caused; it instead establishes a hyperparameter- and threshold-dependent floor on achievable success that is common to all three architectures under Control (Table~\ref{tab:baseline-comparison}), and it is the direct mechanistic reason why the Extreme profile's sensor noise, rather than being purely detrimental, is able to paradoxically improve final localization precision relative to Moderate, as discussed next.
+
+\textbf{Moderate Profile.} Under moderate dose-rate conditions, the median distance falls more slowly and settles at a \emph{higher}, noisier plateau of approximately $0.32$--$0.34\,\text{m}$ from $t \approx 25$ onward. This plateau sits just above the $0.3\,\text{m}$ success threshold, which is the direct, quantitatively traceable cause of the Moderate profile's lower success rate relative to both Control and Extreme in Table~\ref{tab:baseline-comparison}: Gaussian sensor corruption (Eq.~\ref{eq:velocity-update}'s dependence on $\vec{p}_i$, itself corrupted per $\sigma_\gamma^2 D(\vec{x})$) is strong enough at this dose level to degrade final precision, but not strong enough to provide the exploratory benefit discussed next.
+
+\textbf{Extreme Profile.} Under severe gamma bombardment, the median distance descends more slowly at first (still above $0.4\,\text{m}$ at $t=25$) but, notably, continues to improve steadily throughout the remainder of the horizon, reaching the lowest final value of the three regimes ($0.213\,\text{m}$ at $t=149$) rather than plateauing early. This is a genuine and, at first glance, counter-intuitive finding: it arises because the substantially larger sensor noise variance under Extreme dose rates ($\sigma_\gamma^2 D(\vec{x})$ scaling with the much larger $D_{\text{bg}}, K$ of Table~\ref{tab:sim-params}) acts as a stochastic exploration source that helps the swarm escape the same kind of premature-convergence plateau visible in the Control curve, at the cost of slower initial descent, substantially higher cumulative dose exposure (Table~\ref{tab:baseline-comparison}), and far more erratic individual agent trajectories (Fig.~\ref{fig:trajectories}). This is reported here as an honest empirical observation rather than smoothed into a simpler monotonic narrative: radiological interference degrades convergence \emph{speed} monotonically, but its effect on final localization precision is non-monotonic, with Moderate dose rates being strictly worse than either the noise-free Control case or the heavily-perturbed Extreme case.
+
+\subsection{Analysis of Trajectory Geometry}
+\label{sec:trajectory}
+
+Fig.~\ref{fig:trajectories} depicts the physical agent pathways recorded under the Extreme radiation and full turbulent shear condition. Because the fissure lies within the outer $10\%$ of the radial domain, it occupies precisely the region in which the one-seventh power-law profile exhibits its steepest gradient and lowest mean-flow magnitude, consistent with proximity to the no-slip boundary. Agent paths visibly curve and drift under the combined influence of turbulent advection and the drag term of Eq.~(\ref{eq:velocity-update}) rather than tracing direct linear approaches to the target.
+
+The trajectory set as a whole exhibits pronounced spatial dispersion across the plotted domain. This elevated dispersion is the joint product of stochastic turbulent forcing and intermittent loss of coordinate-sharing under $P_{\text{drop}}(\vec{x})$: agents suffering a communication drop (transient, per Eq.~\ref{eq:comm-edge}, or permanent, per the cumulative-dose latch-up condition of Eq.~\ref{eq:latchup}) continue executing cognitively-driven motion decoupled from $\vec{g}_i(t)$, producing the visibly divergent loops, stalls, and off-corridor drifts evident in several plotted paths. Despite this dispersion, no single trajectory's failure to converge compromises the swarm outcome: because the decentralized architecture assigns no privileged coordinating role to any individual agent, a subset of agents remains, at any given timestep, within intermittent communication range of one another, and it is this surviving, momentarily-connected subset that registers proximity to the fissure and propagates an updated $\vec{g}_i(t)$ estimate. This behavioral property is quantitatively confirmed in Section~\ref{sec:baseline}, where the Decentralized M-PSO's success rate is shown to be essentially unaffected by the same conditions under which the Centralized Swarm collapses entirely.
+
+\subsection{Quantitative Performance and Baseline Comparison}
+\label{sec:baseline}
+
+To formally substantiate the resilience claims advanced in this paper, a Monte Carlo benchmarking campaign (500 independent runs per architecture per environmental profile, executed directly by \texttt{pso\_nuclear\_sim.py}) was conducted, comparing the proposed Decentralized M-PSO against two baseline architectures: a Centralized Swarm, in which a single designated leader agent aggregates follower reports and broadcasts a swarm-global $\vec{g}^{\text{best}}$ that is frozen (and, following the leader's own cumulative-dose latch-up, permanently frozen) whenever the leader's own channel state $\chi_{\text{leader}}(t)=0$; and a Canonical PSO, a non-drag-aware, fully-connected variant lacking both the hydrodynamic forcing term of Eq.~(\ref{eq:velocity-update}) and any communication-degradation model. Performance is quantified across three metrics: Target Localization Success Rate (fraction of $500$ runs achieving $\|\vec{g}-\vec{x}_f\| \le 0.3\,\text{m}$ at any point in the horizon, reported with the number of successful runs $n_{\text{success}}$ and a Wilson-score $95\%$ confidence interval), Convergence Time (mean, median, and standard deviation across successful runs only), and Average Cumulative Swarm Dose Received (aggregate absorbed dose across all $N$ agents, summed via Eq.~\ref{eq:cumdose}, in Gy).
+
+\begin{table*}[t]
+\renewcommand{\arraystretch}{1.15}
+\caption{Comparative Performance of Decentralized M-PSO vs. Baseline Architectures (500 Monte Carlo Runs per Condition, Generated Directly by \texttt{pso\_nuclear\_sim.py})}
+\label{tab:baseline-comparison}
+\centering
+\footnotesize
+\begin{tabular}{@{}l l c c c c c c@{}}
+\toprule
+\textbf{Profile} & \textbf{Architecture} & \textbf{Success (\%)} & \textbf{$n_{\text{success}}$} & \textbf{95\% CI} & \textbf{Mean Conv. (steps)} & \textbf{Median Conv.} & \textbf{Cum. Dose (Gy)} \\
+\midrule
+\multirow{3}{*}{Control}
+ & Decentralized M-PSO & 64.8 & 324/500 & [60.5, 68.9] & 5.8  & 3.5  & $0.0$ \\
+ & Centralized Swarm   & 56.6 & 283/500 & [52.2, 60.9] & 14.5 & 12.0 & $0.0$ \\
+ & Canonical PSO       & 58.0 & 290/500 & [53.6, 62.2] & 5.8  & 6.0  & $0.0$ \\
+\midrule
+\multirow{3}{*}{Moderate}
+ & Decentralized M-PSO & 61.4 & 307/500 & [57.1, 65.6] & 12.0 & 5.0  & $1145.0 \pm 98.8$ \\
+ & Centralized Swarm   & 31.8 & 159/500 & [27.9, 36.0] & 24.8 & 18.0 & $1406.9 \pm 193.0$ \\
+ & Canonical PSO       & 40.8 & 204/500 & [36.6, 45.2] & 6.7  & 1.0  & $2974.7 \pm 478.0$ \\
+\midrule
+\multirow{3}{*}{Extreme}
+ & Decentralized M-PSO & \textbf{84.4} & 422/500 & [81.0, 87.3] & 34.0 & 23.0 & $9503.5 \pm 754.6$ \\
+ & Centralized Swarm   & \textbf{1.4}  & 7/500   & [0.7, 2.9]   & 28.0 & 0.0  & $12649.2 \pm 3484.3$ \\
+ & Canonical PSO       & 28.4 & 142/500 & [24.6, 32.5] & 4.8  & 1.0  & $24774.1 \pm 5557.4$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\textbf{Control Profile Analysis.} Under zero-radiation conditions, all three architectures perform comparably, with success rates of $64.8\%$, $56.6\%$, and $58.0\%$ for Decentralized M-PSO, Centralized Swarm, and Canonical PSO respectively, and overlapping $95\%$ confidence intervals for the latter two. This is expected: with no communication degradation and no sensor noise, the architectural distinctions between the three schemes---which exist specifically to handle radiologically-induced failure---have little opportunity to matter, and the residual performance differences are attributable to each architecture's own search dynamics (e.g., the Centralized Swarm's markedly slower convergence, $14.5$ mean steps vs.\ $5.8$ for the other two, reflecting the additional latency of a strict leader-broadcast topology even absent packet loss).
+
+\textbf{Moderate Profile Analysis.} As radiological interference is introduced, all three architectures degrade, but by sharply different margins. The Decentralized M-PSO falls only modestly to $61.4\%$, while the Centralized Swarm falls to $31.8\%$---roughly half its Control-profile value---and the Canonical PSO falls to $40.8\%$. The Centralized Swarm's disproportionate degradation is directly attributable to the structural vulnerability of the leader-follower topology: because the swarm-global estimate can only update when the single leader agent's own channel state $\chi_{\text{leader}}(t)=1$, any packet-drop event affecting the leader specifically---rather than an arbitrary rank-and-file agent---freezes coordination for the entire swarm simultaneously, a failure mode with no analogue in the Decentralized M-PSO's neighborhood-restricted topology, where the loss of any single agent's edges leaves the remainder of $\mathcal{G}(t)$ substantially intact. Cumulative dose figures corroborate this pattern: the Decentralized M-PSO's faster, more reliable convergence yields the lowest aggregate dose exposure ($1145.0\,\text{Gy}$), while the slower-converging, more failure-prone Canonical PSO---which persists searching for the full mission duration on many runs, accumulating dose without a functioning communication model to help it succeed---incurs the highest exposure of the three ($2974.7\,\text{Gy}$).
+
+\textbf{Extreme Profile Analysis.} Under catastrophic gamma flux, the performance gap widens to its most consequential margin, and in a direction that is not simply an extrapolation of the Moderate-profile trend. The Decentralized M-PSO's success rate \emph{rises} to $84.4\%$ ($95\%$ CI $[81.0, 87.3]$), for the noise-assisted-exploration reason discussed in Section~\ref{sec:convergence}. The Centralized Swarm, in stark contrast, collapses to $1.4\%$ ($7$ successes out of $500$ runs, CI $[0.7, 2.9]$)---a functionally total failure. This collapse is mechanistically attributable to early-mission leader latch-up: under Extreme dose rates, the per-agent cumulative dose $\Lambda_i(t)$ of Eq.~(\ref{eq:cumdose}) crosses the failure threshold $\Lambda_{\text{fail}}=300\,\text{Gy}$ well within the $150$-step mission window for agents that spend appreciable time near the high-dose fissure neighborhood; once this happens to the specific agent designated as leader, Eq.~(\ref{eq:latchup}) permanently zeroes its channel state, and the swarm-global estimate freezes for the remainder of the mission regardless of what any follower subsequently discovers. The Canonical PSO baseline also degrades under Extreme conditions ($28.4\%$), but---lacking any communication model to fail in the first place---its degradation is driven purely by sensor-noise corruption of its (always fully-connected) global best, and it is consequently far less catastrophically affected than the Centralized Swarm's structural single point of failure. The Decentralized M-PSO's resilience under this same hazard directly reflects the property formalized in Eq.~(\ref{eq:local-gbest}): individual agent latch-ups or transient dropouts, however frequent, do not collapse the swarm's communication structure as a whole, since the neighborhood set $\mathcal{N}_i(t)$ for any given agent is reconstituted independently at each timestep from whichever agents remain operational, and it is sufficient for any non-empty connected subset of the swarm to retain intermittent connectivity for a valid $\vec{g}_i(t)$ update to propagate.
+
+Taken collectively, these results provide direct, reproducible quantitative support for the central thesis of this paper: decentralization is not merely a qualitative design preference but a measurable architectural necessity, yielding a success-rate advantage over centralized coordination that grows from a negligible difference under benign conditions to a more than $60\times$ relative improvement ($84.4\%$ vs.\ $1.4\%$) under catastrophic radiological adversity---precisely the regime in which autonomous PWR inspection capability is most operationally indispensable.
+
+\section{Conclusion and Future Work}
+\label{sec:conclusion}
+
+This paper has presented a computational framework for autonomous micro-agent inspection of primary Pressurized Water Reactor (PWR) coolant loops, formally addressing the dual-hazard environment defined by high-Reynolds-number turbulent flow and intense, spatially non-homogeneous ionizing radiation. By coupling a one-seventh power-law turbulent fluid velocity profile with a non-linear hydrodynamic drag vector, and by mapping a non-homogeneous gamma dose-rate field to dual-phenomenon microelectronic degradation---continuous Gaussian sensor corruption and discrete, dose-scaled communication loss, backed by a genuine cumulative-dose state governing permanent hardware failure---a reduced-order simulator was constructed and executed to produce every quantitative result reported in Section~\ref{sec:simulation}. The Monte Carlo benchmarking of Section~\ref{sec:baseline} demonstrated that canonical, drag-unaware PSO underperforms across all regimes, while centralized leader-follower architectures are structurally vulnerable to single-point coordination collapse: under catastrophic gamma flux, the centralized baseline's success rate fell to $1.4\%$ while the proposed decentralized, communication-degradation-tolerant M-PSO framework sustained $84.4\%$---a result that substantiates decentralization not as an incremental refinement but as a necessary architectural precondition for resilient autonomous inspection under extreme nuclear environmental stressors. Notably, the swarm's localization precision was found to depend on radiological severity in a non-monotonic way (Section~\ref{sec:convergence}), with moderate noise degrading final precision while more severe noise paradoxically restored it via an exploration-like effect; this nuance is reported honestly here as a finding warranting further investigation rather than smoothed into a simpler narrative.
+
+Notwithstanding these contributions, several modeling limitations must be acknowledged to appropriately contextualize the scope of the presented results. First, the hydrodynamic environment was restricted to a two-dimensional axial-radial cross-sectional plane, employing an empirical one-seventh power-law approximation rather than a fully transient, three-dimensional Reynolds-Averaged Navier-Stokes (RANS) or Large Eddy Simulation (LES) solution; as such, fully three-dimensional flow phenomena---including secondary swirl components, azimuthal velocity variation, and localized vortex shedding structures characteristic of real PWR piping geometries, elbows, and flow obstructions---were not captured. Second, the simulated swarm was assumed to be homogeneous, with all agents possessing identical mass $m$, drag coefficient $C_d$, cross-sectional area $A$, and sensory and radiation-hardness characteristics; this idealization neglects the manufacturing variability, differential degradation rates, and mixed-capability sensor payloads likely to characterize a physically deployed heterogeneous swarm. Third, thermal-hydraulic coupling was neglected in its entirety: the model did not account for fluid temperature and pressure gradients and their consequent effects on coolant viscosity, buoyancy-driven forcing, or the temperature-dependent electronic degradation rates of onboard microelectronics, all of which are physically significant within the elevated-temperature, elevated-pressure operating envelope of an actual PWR primary loop. Fourth, the hyperparameters $(w, c_1, c_2, r_{\text{comm}}, \Lambda_{\text{fail}})$ of Table~\ref{tab:sim-params} were fixed at commonly-used or illustrative values rather than derived from a systematic sensitivity sweep; a full ablation study is identified below as near-term future work. Fifth, the physical parameters of Table~\ref{tab:sim-params} (agent mass, drag coefficient, cross-sectional area, communication range) are illustrative choices consistent with a plausible micro-agent form factor, not values directly measured from or validated against the specifications of deployed nuclear-facility robotic platforms such as MallARD~\cite{groves_mallard} or AVEXIS~\cite{nancekievill_avexis}; grounding these parameters in real platform datasheets is a prerequisite before any hardware-in-the-loop claims can be made.
+
+Future research is directed along four concrete engineering pathways to address these limitations and advance the framework toward physical deployment readiness. First, a three-dimensional computational fluid dynamics (CFD) co-simulation interface is planned, coupling the M-PSO decision layer to a full RANS or LES flow solver, thereby enabling evaluation of swarm behavior under highly localized, three-dimensional vortex-shedding conditions and geometrically complex piping features not representable under the current planar approximation. Second, heterogeneous swarm topologies will be explored, in which a subset of specialized, radiation-hardened "relay nodes"---possessing enhanced shielding and transceiver robustness at the cost of reduced sensing payload---dynamically optimize communication routing on behalf of unshielded, sensor-rich agents, potentially yielding a favorable trade-off between mission-critical connectivity preservation and overall swarm sensing coverage. Third, Hardware-in-the-Loop (HIL) testing configurations are proposed, employing physical micro-submersible prototypes within instrumented, scaled flow loops to validate the M-PSO framework's decentralized coordination logic under genuine sensor noise characteristics, transient flow disturbances, and communication hardware constraints that no purely computational model can fully anticipate. Fourth, a systematic hyperparameter sensitivity sweep over $(w, c_1, c_2, r_{\text{comm}}, \Lambda_{\text{fail}})$ is planned to replace the illustrative fixed values of Table~\ref{tab:sim-params} and to further characterize the non-monotonic noise-precision relationship identified in Section~\ref{sec:convergence}. Collectively, these directions constitute a concrete pathway from the validated computational model presented herein toward a field-deployable autonomous inspection capability for the nuclear power industry's most inaccessible and hazardous structural monitoring domain.
+
+\section*{Code and Data Availability}
+The complete simulator source code (\texttt{pso\_nuclear\_sim.py}), the figure-generation script, and the raw Monte Carlo output logs (\texttt{results\_table2.csv}, \texttt{results\_table2.json}, \texttt{fig1\_convergence\_data.csv}, \texttt{fig2\_trajectory\_data.csv}) used to produce every quantitative result, table, and figure in this paper are permanently archived and publicly available on Zenodo at \url{https://doi.org/10.5281/zenodo.21703782}, so that all reported results may be independently reproduced or extended.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
