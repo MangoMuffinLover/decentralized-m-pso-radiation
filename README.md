@@ -1,45 +1,11 @@
-\# Decentralized M-PSO in High-Radiation Swarm Environments
+# Decentralized Swarm Resilience Under Stochastic Gamma Noise
 
+This repository contains the updated computational model, hyperparameter sweep scripts, and manuscript source.
 
+> **Publication Note:** An earlier iteration of this work, titled *"Decentralized M-PSO in High-Radiation Swarm Environments"*, was accepted at IECON 2026. This repository reflects the updated, extended framework.
 
-This repository contains the simulation framework, experimental dataset, and figure generation pipeline for the manuscript:
-
-\*\*"Decentralized M-PSO in High-Radiation Swarm Environments"\*\*
-
-
-
-\---
-
-
-
-\## Repository Structure
-
-
-
-```text
-
-decentralized-m-pso-radiation/
-
-│
-
-├── data/
-
-│   ├── fig1\\\_convergence\\\_data.csv    # Step-by-step convergence trace data
-
-│   ├── fig2\\\_trajectory\\\_data.csv     # Agent spatial coordinates (x, y, z) over time
-
-│   ├── results\\\_table2.csv           # Benchmark statistics (success rates, mean convergence)
-
-│   └── results\\\_table2.json          # Machine-readable output for Table II summary
-
-│
-
-├── make\\\_figures.py                  # Script to render publication-ready vector PDF figures
-
-├── pso\\\_nuclear\\\_sim.py              # Core Monte Carlo simulation engine
-
-├── README.md                        # Repository documentation
-
-└── LICENSE                          # MIT License
-
-
+## Repository Structure
+- `src/`: Simulation scripts (`pso_nuclear_sim.py`) and parameter sweep pipeline (`sensitivity_sweep.py`).
+- `paper/`: Full LaTeX source (`main.tex`), compiled manuscript (`main.pdf`), and bibliography.
+- `data/`: CSV raw outputs from sensitivity sweeps ($N$ and $r_{\text{comm}}$).
+- `figures/`: Convergence and trajectory plots under stochastic gamma noise.
