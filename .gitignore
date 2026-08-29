@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.synctex.gz
+paper/main_camera_ready.pdf

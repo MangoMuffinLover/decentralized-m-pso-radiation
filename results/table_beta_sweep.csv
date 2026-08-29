@@ -1,0 +1,11 @@
+beta_s_per_Gy,Architecture,Success(%),n_success,n_total,CI95_low,CI95_high,NonTrivialSuccess(%),MeanFracIsolated,LeaderLatchupRate(%),CumDose(Gy)
+0.05,Decentralized M-PSO,71.6,358,500,67.5,75.4,62.8,0.7360,,9652.5
+0.05,Centralized Swarm,3.8,19,500,2.4,5.9,2.6,0.8337,92.8,12152.7
+0.1,Decentralized M-PSO,78.0,390,500,74.2,81.4,72.4,0.8789,,9567.3
+0.1,Centralized Swarm,2.4,12,500,1.4,4.1,0.3,0.9266,88.2,12501.4
+0.15,Decentralized M-PSO,85.6,428,500,82.3,88.4,81.7,0.9347,,9502.5
+0.15,Centralized Swarm,1.4,7,500,0.7,2.9,0.0,0.9576,81.0,12645.8
+0.3,Decentralized M-PSO,88.8,444,500,85.7,91.3,85.6,0.9830,,9253.7
+0.3,Centralized Swarm,1.2,6,500,0.6,2.6,0.0,0.9892,59.8,11960.2
+0.5,Decentralized M-PSO,87.6,438,500,84.4,90.2,85.0,0.9970,,9137.3
+0.5,Centralized Swarm,1.0,5,500,0.4,2.3,0.0,0.9980,52.6,11370.9

@@ -1,0 +1,13 @@
+cff-version: 1.2.0
+message: "If you use this simulator or its archived results, please cite this software release and the accompanying paper."
+title: "Decentralized Swarm Resilience Under Stochastic Gamma Noise: Reproducibility Package"
+type: software
+authors:
+  - family-names: Shaji
+    given-names: "Dhyan Ishwar"
+    orcid: "https://orcid.org/0009-0006-6063-4533"
+version: 2.1.0
+date-released: 2026-08-29
+doi: 10.5281/zenodo.22166217
+url: "https://doi.org/10.5281/zenodo.22166217"
+repository-code: "https://github.com/MangoMuffinLover/decentralized-m-pso-radiation"

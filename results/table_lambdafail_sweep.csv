@@ -1,0 +1,11 @@
+Lambda_fail_Gy,Architecture,Success(%),n_success,n_total,CI95_low,CI95_high,NonTrivialSuccess(%),MeanFracIsolated,LeaderLatchupRate(%),CumDose(Gy)
+100.0,Decentralized M-PSO,86.0,430,500,82.7,88.8,81.7,0.9425,,9564.7
+100.0,Centralized Swarm,1.0,5,500,0.4,2.3,0.0,0.9641,100.0,12431.1
+200.0,Decentralized M-PSO,83.0,415,500,79.5,86.0,78.2,0.9384,,9452.4
+200.0,Centralized Swarm,0.4,2,500,0.1,1.4,0.0,0.9623,96.2,12528.1
+300.0,Decentralized M-PSO,83.6,418,500,80.1,86.6,79.0,0.9357,,9526.9
+300.0,Centralized Swarm,0.6,3,500,0.2,1.7,0.3,0.9586,84.6,12464.5
+500.0,Decentralized M-PSO,85.2,426,500,81.8,88.0,81.4,0.9294,,9473.5
+500.0,Centralized Swarm,3.4,17,500,2.1,5.4,0.8,0.9572,33.4,12596.9
+800.0,Decentralized M-PSO,83.0,415,500,79.5,86.0,78.1,0.9294,,9446.8
+800.0,Centralized Swarm,1.8,9,500,0.9,3.4,1.1,0.9565,9.4,12506.0
