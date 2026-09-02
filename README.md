@@ -1,7 +1,4 @@
-# IECON 2026 reproducibility repository
-
-This repository accompanies *Decentralized Swarm Resilience Under Stochastic
-Gamma Noise: A Computational Model for Pressure Vessel Inspection*.
+# This repository accompanies *Decentralized Swarm Resilience Under Stochastic Gamma Noise: A Computational Model for Pressure Vessel Inspection*.
 
 - Development repository: https://github.com/MangoMuffinLover/decentralized-m-pso-radiation
 - Archived release v2.1.0: https://doi.org/10.5281/zenodo.22166217
