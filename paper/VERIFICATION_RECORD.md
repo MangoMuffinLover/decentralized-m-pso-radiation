@@ -11,6 +11,9 @@
 - The mechanism statement is restricted to implemented model facts; replication
   staleness was not instrumented and is not claimed as a measured result.
 
-No manuscript PDF is bundled because this environment has no TeX engine.
-Compile the canonical source, then confirm six pages, file size, font embedding,
-figure/table placement, and IEEE PDF validation before upload.
+The bundled `IECON2026_camera_ready.pdf` is the final PDF eXpress-certified
+camera-ready artifact (SHA-256:
+`6C956877B751C4F4F6BDC58346DDC0C90AB916CC3B3479B5EDD35E94A89C42F9`).
+It is six US-letter pages and 360,294 bytes. A rebuild from source should still
+be checked independently for page count, fonts, figure/table placement, and
+conference validation.

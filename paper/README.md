@@ -25,6 +25,7 @@ file-size limit.
 ## Included files
 
 - `main_final_submission.tex`: final manuscript source.
+- `IECON2026_camera_ready.pdf`: six-page IEEE PDF eXpress-certified camera-ready manuscript.
 - `references_IECON.bib`: bibliography used by the manuscript.
 - `pso_convergence_rates.pdf`, `pso_swarm_trajectories.pdf`: original result figures.
 - `comm_fragility_sweep.pdf`: verified 500-trial communication-fragility figure.
