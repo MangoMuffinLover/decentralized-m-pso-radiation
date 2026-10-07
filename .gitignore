@@ -12,4 +12,3 @@ venv/
 *.log
 *.out
 *.synctex.gz
-paper/main_camera_ready.pdf

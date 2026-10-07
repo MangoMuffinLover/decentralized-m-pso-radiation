@@ -2,7 +2,7 @@
 
 ## Main manuscript campaign
 
-Table II of the camera-ready manuscript reports 500 independent trials for each architecture/profile pair. Under the modeled Extreme profile:
+Table II of the published manuscript reports 500 independent trials for each architecture/profile pair. Under the modeled Extreme profile:
 
 | Architecture | Success | Wilson 95% CI | Non-trivial success |
 |---|---:|---:|---:|
@@ -50,4 +50,3 @@ Several nominal decentralized campaigns appear in the paper and repository. Thei
 ![Convergence across radiation profiles](assets/convergence_rates.png)
 
 ![Representative Extreme-profile swarm trajectories](assets/swarm_trajectories.png)
-

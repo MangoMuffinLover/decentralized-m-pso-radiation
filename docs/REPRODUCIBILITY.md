@@ -71,20 +71,13 @@ Changing a condition identity intentionally creates a different stream. Therefor
 - Non-trivial success: success after excluding trials initialized inside the success radius.
 - Full grids are archived even when the six-page paper reports only a compact subset.
 
-## 8. Paper build
+## 8. Publication boundary
 
-The canonical LaTeX source is `paper/main_final_submission.tex`. From the `paper/` directory:
-
-```bash
-pdflatex main_final_submission
-bibtex main_final_submission
-pdflatex main_final_submission
-pdflatex main_final_submission
-```
-
-The bundled `paper/IECON2026_camera_ready.pdf` is the six-page IEEE PDF eXpress-certified camera-ready artifact. If rebuilding, independently confirm page count, embedded fonts, figure placement, and conference compliance.
+The IEEE article and its Version of Record are not distributed from this
+repository. Access the publication through its official IEEE Xplore record.
+This repository reproduces the computational experiments, aggregate evidence,
+and independently generated figures.
 
 ## 9. Reproducibility boundary
 
 Reproduction means recovering the released computational results under the released model. It does not validate the model against an operating pressure vessel, prove universal superiority of decentralized control, or substitute for hardware testing.
-

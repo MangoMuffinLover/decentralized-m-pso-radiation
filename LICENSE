@@ -22,4 +22,4 @@ SOFTWARE.
 
 Scope: this license applies to the simulator and supporting source code in
 `pso_nuclear_sim/`, `scripts/`, and `tests/`. It does not grant publication
-rights to the manuscript or figure assets in `paper/` and `figures/`.
+rights to the IEEE article or the figure assets in `figures/`.
